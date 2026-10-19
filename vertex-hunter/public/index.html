@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vertex Hunter</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='none' stroke='%2327e6ff' stroke-width='2'/%3E%3Ccircle cx='8' cy='8' r='2.5' fill='%2327e6ff'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#04070f">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="/app.css">
 </head>
 <body>
@@ -22,7 +25,8 @@
   <div class="status">
     <div id="healthPill" class="pill disc"><i></i><span>CONNECTING</span></div>
     <div class="dim small" id="healthDetail">&nbsp;</div>
-    <button id="bell" class="bell" title="Notifications" aria-label="Notifications">&#9679;<em id="bellCount" hidden>0</em></button>
+    <button id="installApp" class="btn install-btn" hidden type="button">INSTALL APP</button>
+    <button id="bell" class="bell" title="Notifications and alert permissions" aria-label="Notifications and alert permissions">&#9679;<em id="bellCount" hidden>0</em></button>
   </div>
 </header>
 <div id="banner" class="banner" hidden></div>
