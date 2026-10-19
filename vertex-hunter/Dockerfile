@@ -2,8 +2,8 @@ FROM node:22-slim
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
 COPY scripts ./scripts
+RUN npm ci --omit=dev
 COPY src ./src
 COPY public ./public
 RUN node scripts/copy-vendor.mjs
