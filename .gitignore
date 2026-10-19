@@ -1,0 +1,19 @@
+# Node dependencies and logs
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Local environment secrets
+.env
+.env.*
+!.env.example
+
+# Persistent runtime data
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Generated chart vendor file (recreated by npm install)
+vertex-hunter/public/vendor/
