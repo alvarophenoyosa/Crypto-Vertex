@@ -77,3 +77,54 @@ ul.reasons{margin:6px 0;padding-left:18px}ul.reasons li{margin:3px 0}
 @media(max-width:700px){header.top{gap:8px}.setrow{grid-template-columns:1fr}}
 
 .setrow input[type=number]{max-width:160px}
+
+
+/* Mobile-first refinements; desktop visual language remains unchanged. */
+.install-btn{white-space:nowrap}
+#eqChart{display:block;width:100%;height:180px;min-height:180px;background:rgba(8,17,31,.45);border:1px solid var(--line);border-radius:6px;touch-action:pan-y}
+@media(max-width:900px){
+  header.top{position:sticky;padding:8px 10px;gap:8px}
+  .brand{flex:1;min-width:180px}
+  nav{order:3;flex:1 0 100%;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:thin;gap:4px}
+  nav button{flex:0 0 auto;padding:10px 11px;font-size:10px}
+  .status{margin-left:auto;gap:7px}
+  #healthDetail{display:none}
+  main{padding:12px 10px 32px}
+  .grid2{grid-template-columns:minmax(0,1fr);gap:12px}
+  .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cards.wide{grid-template-columns:minmax(0,1fr)}
+  .card{min-width:0;padding:10px}
+  .card .v{font-size:17px;overflow-wrap:anywhere}
+  .scan-head{align-items:flex-start}
+  .scan-meta{max-width:100%;overflow-wrap:anywhere}
+  .table-wrap{max-width:100%;overscroll-behavior-x:contain}
+  table{min-width:720px}
+  #market{min-width:430px}
+  .detail{width:100vw;border-left:0}
+  .detail-head{gap:8px;padding:10px}
+  .detail-body{padding:10px 10px 28px}
+  #chart{height:260px}
+  .notif{top:58px;right:8px;width:min(360px,calc(100vw - 16px))}
+  #toasts{left:8px;right:8px;bottom:8px}
+  .toast{max-width:none}
+  .setrow{grid-template-columns:minmax(0,1fr) minmax(100px,160px);gap:8px}
+  .setrow input[type=number]{max-width:100%;width:100%}
+}
+@media(max-width:480px){
+  html,body{font-size:12px}
+  .brand{font-size:11px;gap:5px;letter-spacing:.12em;min-width:0}
+  .brand .tag{font-size:8px;margin-left:2px}
+  .pill{font-size:9px;padding:4px 7px;letter-spacing:.08em}
+  .status{gap:5px}
+  .install-btn{font-size:9px;padding:6px 7px;letter-spacing:.04em}
+  .cards{gap:7px}
+  .card .k{font-size:9px;letter-spacing:.08em}
+  .card .v{font-size:15px}
+  .legend{gap:8px}
+  .kv{grid-template-columns:1fr}
+  .comp{grid-template-columns:78px minmax(0,1fr) 34px;gap:5px}
+  .filters>*{max-width:100%}
+  .filters input:not([type=number]){min-width:0;flex:1}
+  .scan-head h2{font-size:15px}
+  #chart{height:220px}
+}
