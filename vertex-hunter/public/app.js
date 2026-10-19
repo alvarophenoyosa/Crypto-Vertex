@@ -170,12 +170,33 @@ async function loadWallet() {
   drawEquity(w.equityCurve);
 }
 function drawEquity(pts) {
-  const cv = $('#eqChart'); const ctx = cv.getContext('2d'); const W = cv.width = cv.clientWidth * devicePixelRatio, H = cv.height = 150 * devicePixelRatio; ctx.clearRect(0, 0, W, H);
-  if (pts.length < 2) { ctx.fillStyle = '#6f84a0'; ctx.font = `${12 * devicePixelRatio}px sans-serif`; ctx.fillText('Equity history builds up while the feed is live (one point per 30s)', 10, 24 * devicePixelRatio); return; }
-  const ys = pts.map((p) => p.equity), mn = Math.min(...ys, 100) - 0.5, mx = Math.max(...ys, 100) + 0.5;
-  ctx.strokeStyle = '#27e6ff'; ctx.lineWidth = 1.5 * devicePixelRatio; ctx.beginPath();
-  pts.forEach((p, i) => { const x = (i / (pts.length - 1)) * W, y = H - ((p.equity - mn) / (mx - mn)) * H; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
-  ctx.strokeStyle = '#16243b'; ctx.setLineDash([4, 4]); const y100 = H - ((100 - mn) / (mx - mn)) * H; ctx.beginPath(); ctx.moveTo(0, y100); ctx.lineTo(W, y100); ctx.stroke(); ctx.setLineDash([]);
+  const cv = $('#eqChart'); if (!cv) return;
+  const ctx = cv.getContext('2d'); const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const cssW = Math.max(1, cv.clientWidth); const cssH = Math.max(150, cv.clientHeight || 180);
+  const W = Math.round(cssW * dpr), H = Math.round(cssH * dpr);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, cssW, cssH);
+  const pad = { left: 12, right: 12, top: 12, bottom: 12 }, plotW = cssW - pad.left - pad.right, plotH = cssH - pad.top - pad.bottom;
+  if (!Array.isArray(pts) || pts.length < 2) {
+    ctx.fillStyle = '#6f84a0'; ctx.font = '12px sans-serif';
+    ctx.fillText('Equity history builds up while the feed is live (one point per 30s)', pad.left, pad.top + 14); return;
+  }
+  // Sort/dedupe timestamps and use elapsed time for x coordinates so updates don't
+  // stretch the whole curve or make it appear to race ahead on every refresh.
+  const byTime = new Map();
+  for (const p of pts) if (Number.isFinite(Number(p.ts)) && Number.isFinite(Number(p.equity))) byTime.set(Number(p.ts), { ts: Number(p.ts), equity: Number(p.equity) });
+  const data = [...byTime.values()].sort((a,b) => a.ts - b.ts).slice(-1500);
+  if (data.length < 2) return;
+  const ys = data.map(p => p.equity), min = Math.min(...ys, 100), max = Math.max(...ys, 100);
+  const span = Math.max(0.2, max - min), mn = min - Math.max(0.1, span * 0.12), mx = max + Math.max(0.1, span * 0.12);
+  const t0 = data[0].ts, t1 = data[data.length - 1].ts, dt = Math.max(1, t1 - t0);
+  const xAt = t => pad.left + ((t - t0) / dt) * plotW;
+  const yAt = v => pad.top + (1 - (v - mn) / (mx - mn)) * plotH;
+  ctx.strokeStyle = '#16243b'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+  const y100 = yAt(100); ctx.beginPath(); ctx.moveTo(pad.left,y100); ctx.lineTo(cssW-pad.right,y100); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = '#27e6ff'; ctx.lineWidth = 1.8; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.beginPath();
+  data.forEach((p,i) => { const x=xAt(p.ts), y=yAt(p.equity); if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }); ctx.stroke();
+  const last = data[data.length-1]; ctx.fillStyle = '#27e6ff'; ctx.beginPath(); ctx.arc(xAt(last.ts),yAt(last.equity),3,0,Math.PI*2); ctx.fill();
 }
 
 // ------------------------------------------------------------------ strategies & settings
@@ -228,6 +249,24 @@ $('#btRun').onclick = async () => {
 
 // ------------------------------------------------------------------ notifications
 let lastNotifId = Number(localStorage.getItem('vh_last_notif') || 0);
+async function requestAlerts() {
+  if (!('Notification' in window)) { toast('Notifications unavailable', 'This browser does not support system notifications.'); return; }
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') toast('Alerts enabled', 'Vertex Hunter can show signal and paper-trade alerts while this app is open.');
+    else toast('Alerts not enabled', 'Allow notifications in your browser settings to receive alerts.');
+  } catch { toast('Alerts unavailable', 'Please enable notifications in your browser settings.'); }
+}
+async function showSystemNotification(n) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const options = { body: String(n.body || ''), tag: 'vertex-' + n.id, icon: '/icon-192.png', badge: '/icon-192.png' };
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification(String(n.title || 'Vertex Hunter'), options);
+    } else new Notification(String(n.title || 'Vertex Hunter'), options);
+  } catch {}
+}
 async function pollNotifs(initial) {
   const { items } = await api('/api/notifications');
   const fresh = items.filter((n) => n.id > lastNotifId).reverse();
@@ -235,10 +274,21 @@ async function pollNotifs(initial) {
   if (items.length) { lastNotifId = Math.max(lastNotifId, items[0].id); try { localStorage.setItem('vh_last_notif', String(lastNotifId)); } catch {} }
   const unread = items.filter((n) => !n.read).length;
   $('#bellCount').hidden = !unread; $('#bellCount').textContent = unread;
-  if (!$('#notifPanel').hidden) $('#notifPanel').innerHTML = items.length ? items.map((n) => `<div class="it"><b>${esc(n.title)}</b><span class="small">${esc(n.body)}</span><div class="dim small">${ts(n.ts)}</div></div>`).join('') : '<div class="it dim">No notifications yet.</div>';
-  if (!initial && fresh.length && 'Notification' in window && Notification.permission === 'granted') fresh.forEach((n) => new Notification(n.title, { body: n.body }));
+  if (!$('#notifPanel').hidden) $('#notifPanel').innerHTML = '<div class="filters" style="padding:8px"><button id="enableAlerts" class="btn">ENABLE PHONE / DESKTOP ALERTS</button></div>' + (items.length ? items.map((n) => `<div class="it"><b>${esc(n.title)}</b><span class="small">${esc(n.body)}</span><div class="dim small">${ts(n.ts)}</div></div>`).join('') : '<div class="it dim">No notifications yet.</div>');
+  const enable = $('#enableAlerts'); if (enable) enable.onclick = requestAlerts;
+  if (!initial && fresh.length) fresh.forEach(showSystemNotification);
 }
-$('#bell').onclick = async () => { const p = $('#notifPanel'); p.hidden = !p.hidden; if (!p.hidden) { await pollNotifs(true); await post('/api/notifications'); pollNotifs(true); if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } };
+$('#bell').onclick = async () => {
+  const p = $('#notifPanel'); p.hidden = !p.hidden;
+  if (!p.hidden) {
+    await pollNotifs(true);
+    await post('/api/notifications');
+    pollNotifs(true);
+    if ('Notification' in window && Notification.permission === 'default') {
+      const enable = $('#enableAlerts'); if (enable) enable.textContent = 'ENABLE PHONE / DESKTOP ALERTS';
+    }
+  }
+};
 function toast(title, body) { const t = document.createElement('div'); t.className = 'toast'; t.innerHTML = `<b>${esc(title)}</b><div class="small">${esc(body)}</div>`; $('#toasts').append(t); setTimeout(() => t.remove(), 7000); }
 
 // ------------------------------------------------------------------ refresh loop + SSE
@@ -255,6 +305,14 @@ setInterval(() => refresh(), 2500);
 setInterval(() => { if (detailSymbol && !$('#detail').hidden) openDetail(detailSymbol); }, 8000);
 setInterval(() => pollNotifs(false).catch(() => {}), 4000);
 try { const es = new EventSource('/api/events' + (tokenQ ? '?token=' + encodeURIComponent(tokenQ) : '')); es.addEventListener('notification', () => pollNotifs(false).catch(() => {})); es.onerror = () => {}; } catch {}
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {});
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', (event) => { event.preventDefault(); installPrompt = event; const b = $('#installApp'); if (b) b.hidden = false; });
+window.addEventListener('appinstalled', () => { installPrompt = null; const b = $('#installApp'); if (b) b.hidden = true; toast('Installed', 'Vertex Hunter has been added to your home screen.'); });
+$('#installApp').onclick = async () => {
+  if (!installPrompt) { toast('Install Vertex Hunter', 'Use your browser menu and choose “Add to Home Screen” or “Install app”.'); return; }
+  installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; $('#installApp').hidden = true;
+};
 pollNotifs(true).catch(() => {}); refresh(true);
 
 // ------------------------------------------------------------------ ambient particles (decorative only)
