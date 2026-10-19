@@ -233,7 +233,7 @@ const STRATEGY_DOCS = [
   { key: 'reversalExhaustion', name: 'Failed breakout / exhaustion', logic: 'Penalty (and INVALIDATED state) when a recent bar broke the 48-bar level but closed back inside; penalty for extended moves with rejection wicks or fading volume.', inputs: 'Min5 candles' },
 ];
 
-const MIME: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json', '.ico': 'image/x-icon' };
+const MIME: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json; charset=utf-8', '.ico': 'image/x-icon' };
 
 const server = createServer(async (req, res) => {
   try {
