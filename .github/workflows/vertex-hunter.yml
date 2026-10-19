@@ -1,0 +1,32 @@
+name: Vertex Hunter checks
+
+on:
+  push:
+    paths:
+      - "vertex-hunter/**"
+      - ".github/workflows/vertex-hunter.yml"
+  pull_request:
+    paths:
+      - "vertex-hunter/**"
+      - ".github/workflows/vertex-hunter.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vertex-hunter
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: vertex-hunter/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run automated tests
+        run: npm test
