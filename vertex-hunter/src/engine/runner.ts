@@ -1,6 +1,6 @@
 // Orchestrates feed -> store -> scanner -> signals -> paper wallet. All market inputs come from MarketStore (live data only).
 import type { DB } from '../db.ts';
-import { activeConfig, addNotification, logEvent } from '../db.ts';
+import { activeConfig, addNotification, getKv, logEvent, setKv } from '../db.ts';
 import type { AppConfig } from '../config.ts';
 import { computeHealth, type Health } from '../health.ts';
 import type { MarketStore } from '../market.ts';
@@ -9,6 +9,7 @@ import type { MexcWs } from '../mexc/ws.ts';
 import type { Interval, Ticker } from '../mexc/types.ts';
 import { INTERVAL_SECONDS } from '../mexc/types.ts';
 import { evaluate, qualifies, type Candidate } from './scoring.ts';
+import { getMoverSession, rankMoverSnapshot } from './session.ts';
 import { SignalTracker } from '../signals.ts';
 import { PaperWallet } from '../wallet/paper.ts';
 
@@ -130,8 +131,29 @@ export class Runner {
         if (contract) wallet.manage(t.symbol, { nowMs, cfg: cfg.config, cfgVersion: cfg.version, actionable: this.health.actionable, contract, ticker: tk, spreadBps: store.spreadBps(t.symbol) });
       }
     }
+    this.captureMoverSessionSnapshot();
     this.updateHealth();
     if (watched.size) { this.deps.onChange?.('wallet'); this.deps.onChange?.('signals'); }
+  }
+
+  /** Persist one leaderboard snapshot per 21:00 PKT session; ranking never triggers trades. */
+  private captureMoverSessionSnapshot(): void {
+    const { db, store } = this.deps;
+    const nowMs = this.now();
+    const session = getMoverSession(nowMs);
+    const sessionKey = 'mover_snapshot_session';
+    if (getKv(db, sessionKey) === session.sessionKey || store.tickers.size === 0) return;
+    const snapshot = rankMoverSnapshot(
+      [...store.tickers.values()].map((ticker) => ({
+        symbol: ticker.symbol,
+        change24hPct: this.change24hPct(ticker.symbol),
+        eligibleFutures: store.eligible.has(ticker.symbol),
+      })),
+      nowMs,
+    );
+    setKv(db, sessionKey, snapshot.sessionKey);
+    setKv(db, 'mover_snapshot_latest', JSON.stringify(snapshot));
+    logEvent(db, 'info', 'mover-session', `Captured 21:00 PKT mover snapshot ${snapshot.sessionKey}: ${snapshot.gainers.length} gainers, ${snapshot.losers.length} losers`, { capturedAt: nowMs, sessionStartedAt: snapshot.sessionStartedAt });
   }
 
   updateHealth(): Health {
