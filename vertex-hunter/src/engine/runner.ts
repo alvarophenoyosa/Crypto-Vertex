@@ -10,6 +10,7 @@ import type { Interval, Ticker } from '../mexc/types.ts';
 import { INTERVAL_SECONDS } from '../mexc/types.ts';
 import { evaluate, qualifies, type Candidate } from './scoring.ts';
 import { getMoverSession, rankMoverSnapshot } from './session.ts';
+import { assessEarlyMover } from './early-mover.ts';
 import { SignalTracker } from '../signals.ts';
 import { PaperWallet } from '../wallet/paper.ts';
 
@@ -331,6 +332,12 @@ export class Runner {
       }
 
       const best = res.best;
+      if (best) {
+        const early = assessEarlyMover(best);
+        best.metrics.earlyMoverScore = early.score;
+        best.metrics.earlyMoverTier = early.tier;
+        best.metrics.earlyMoverReasons = early.reasons.join('; ');
+      }
       if (best && qualifies(best, config)) {
         seen.add(symbol);
         this.upsertShortlist(best, nowMs, ticker, symbol);
