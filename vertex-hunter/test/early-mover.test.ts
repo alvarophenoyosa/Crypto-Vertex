@@ -30,7 +30,7 @@ test('short ranking interprets negative momentum and negative book imbalance as 
     moveLookbackPct: -2, change24hPct: -6,
   }, 'SHORT'));
   const opposite = assessEarlyMover(candidate({
-    volumeZ: 3, accelZ: 1, retMin5m3: 0.4, bookImbalance: 0.3,
+    volumeZ: 3, accelZ: 1, retMin5x3: 0.4, bookImbalance: 0.3,
   }, 'SHORT'));
   assert.ok(short.score > opposite.score);
 });
