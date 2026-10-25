@@ -2,7 +2,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_CONFIG, env, mergeConfig, STRATEGY_VERSION } from './config.ts';
+import { DEFAULT_CONFIG, env, mergeConfig, STRATEGY_VERSION, validateConfig } from './config.ts';
+import { STRATEGY_MODES, applyStrategyMode, type StrategyMode } from './engine/modes.ts';
 import { activateConfigVersion, activeConfig, logEvent, openDb, saveConfigVersion } from './db.ts';
 import { MarketStore } from './market.ts';
 import { MexcRest } from './mexc/rest.ts';
@@ -136,6 +137,27 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
   if (p === '/api/events-log') return json(res, 200, { items: db.prepare('SELECT * FROM events ORDER BY seq DESC LIMIT ?').all(Number(url.searchParams.get('limit') ?? 200)) });
   if (p === '/api/analytics') return json(res, 200, analytics());
+  if (p === '/api/strategy-modes') {
+    if (method === 'POST') {
+      const b = await body(req);
+      const mode = String(b.mode ?? '').toUpperCase() as StrategyMode;
+      try {
+        if (!(mode in STRATEGY_MODES)) throw new Error('unknown strategy mode');
+        const cur = activeConfig(db);
+        const next = applyStrategyMode(cur.config, mode);
+        validateConfig(next);
+        const id = saveConfigVersion(db, next, `strategy mode: ${mode}`);
+        runner.reloadConfig();
+        logEvent(db, 'info', 'strategy-mode', `Applied ${mode} paper profile as config version ${id}`);
+        return json(res, 200, { ok: true, mode, version: id, config: next });
+      } catch (e: any) { return json(res, 400, { error: e.message }); }
+    }
+    return json(res, 200, {
+      modes: Object.entries(STRATEGY_MODES).map(([id, preset]) => ({ id, label: preset.label, description: preset.description })),
+      activeConfig: activeConfig(db),
+      paperTradingOnly: true,
+    });
+  }
   if (p === '/api/config') {
     if (method === 'POST') {
       const b = await body(req);

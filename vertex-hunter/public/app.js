@@ -209,14 +209,20 @@ async function loadStrategies() {
 document.addEventListener('change', async (e) => { const k = e.target.dataset?.strat; if (!k) return; try { await post('/api/config', { label: `${e.target.checked ? 'enable' : 'disable'} ${k}`, patch: { strategies: { [k]: { enabled: e.target.checked } } } }); toast('Strategy updated', k + (e.target.checked ? ' enabled' : ' disabled')); } catch (er) { toast('Rejected', er.message); } loadStrategies(); });
 
 async function loadSettings() {
-  const c = await api('/api/config');
+  const [c, modes] = await Promise.all([api('/api/config'), api('/api/strategy-modes')]);
   const cfg = c.active.config;
   const field = (path, v) => `<input data-path="${path}" type="${typeof v === 'boolean' ? 'checkbox' : 'number'}" step="any" ${typeof v === 'boolean' ? (v ? 'checked' : '') : `value="${v}"`}>`;
   const groups = ['risk', 'thresholds', 'weights', 'dataQuality'];
   $('#settingsBody').innerHTML = `<div class="warnbox">Paper trading only. Leverage here is a simulation parameter: margin ROI is shown separately from price movement and includes fees, slippage, funding and an estimated-liquidation cut-off.</div>
+  <div class="panel"><h3>Strategy mode profiles</h3><div class="small dim">Apply a versioned preset for faster or longer paper setups. These are starting configurations, not proven profitable strategies. Swing mode currently still uses 5m/15m/1h signal inputs.</div><div class="cards">${modes.modes.map((m) => `<div class="card"><b>${esc(m.label)}</b><div class="small dim" style="margin:8px 0">${esc(m.description)}</div><button class="btn" data-mode="${esc(m.id)}">Apply ${esc(m.label)}</button></div>`).join('')}</div></div>
   <div class="panel"><div class="setrow"><span>AI wallet automation</span>${field('walletEnabled', cfg.walletEnabled)}</div>${groups.map((g) => `<h3>${g}</h3>` + Object.entries(cfg[g]).map(([k, v]) => `<div class="setrow"><span>${k}</span>${field(g + '.' + k, v)}</div>`).join('')).join('')}
   <div class="filters" style="margin-top:12px"><input id="cfgLabel" placeholder="Change note (optional)" style="width:260px"><button class="btn" id="cfgSave">Save as new version</button></div></div>
   <div class="panel"><h3>Config versions (active: #${c.active.version})</h3>${c.versions.map((v) => `<div class="setrow"><span>#${v.id} · ${esc(v.label)} <span class="dim small">${ts(v.created_at)}</span></span><span>${v.id === c.active.version ? '<span class="badge b-g">ACTIVE</span>' : `<button class="btn" data-revert="${v.id}">Activate</button>`}</span></div>`).join('')}</div>`;
+  $('[data-mode]').forEach((b) => (b.onclick = async () => {
+    if (!confirm(`Apply ${b.dataset.mode} preset? This changes the active scanner thresholds, component weights and paper-wallet risk settings, and saves a new config version.`)) return;
+    try { const r = await post('/api/strategy-modes', { mode: b.dataset.mode }); toast('Mode applied', `${r.mode} is active as config version #${r.version}`); loadSettings(); loadStrategies(); }
+    catch (er) { toast('Rejected', er.message); }
+  }));
   $('#cfgSave').onclick = async () => {
     const patch = {};
     $$('#settingsBody input[data-path]').forEach((i) => { const parts = i.dataset.path.split('.'); let o = patch; parts.slice(0, -1).forEach((p) => (o = o[p] ??= {})); o[parts.at(-1)] = i.type === 'checkbox' ? i.checked : Number(i.value); });
