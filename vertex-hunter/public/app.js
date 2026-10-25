@@ -51,6 +51,23 @@ function renderHealth(h, extra) {
 }
 
 // ------------------------------------------------------------------ scanner
+async function loadQuickModes() {
+  const data = await api('/api/strategy-modes');
+  const label = String(data.activeConfig?.label || '');
+  const activeMode = (label.match(/strategy mode:\\s*(SCALPING|HOLDING|SWING)/i) || [])[1]?.toUpperCase() || null;
+  $('#quickModeStatus').textContent = activeMode ? activeMode + ' ACTIVE' : 'Choose a mode';
+  $('#quickModes').innerHTML = data.modes.map((m) => '<button class="btn mode-btn ' + (m.id === activeMode ? 'active' : '') + '" data-quick-mode="' + esc(m.id) + '">' + esc(m.label) + '</button>').join('') + '<span class="small dim mode-note">Paper profiles only · not yet proven profitable</span>';
+  $('[data-quick-mode]').forEach((b) => (b.onclick = async () => {
+    if (b.dataset.quickMode === activeMode) return;
+    if (!confirm('Switch the active paper scanner to ' + b.dataset.quickMode + '? This saves a new config version; it does not place real orders.')) return;
+    try {
+      const result = await post('/api/strategy-modes', { mode: b.dataset.quickMode });
+      toast('Strategy switched', result.mode + ' is active as config version #' + result.version);
+      await loadQuickModes();
+      await refresh(true);
+    } catch (e) { toast('Strategy not changed', e.message); }
+  }));
+}
 async function loadScanner() {
   const [s, m, st] = await Promise.all([api('/api/shortlist'), api('/api/market'), api('/api/status')]);
   renderHealth(s.health);
@@ -319,7 +336,7 @@ $('#installApp').onclick = async () => {
   if (!installPrompt) { toast('Install Vertex Hunter', 'Use your browser menu and choose “Add to Home Screen” or “Install app”.'); return; }
   installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; $('#installApp').hidden = true;
 };
-pollNotifs(true).catch(() => {}); refresh(true);
+pollNotifs(true).catch(() => {}); loadQuickModes().catch((e) => toast('Strategy profiles unavailable', e.message)); refresh(true);
 
 // ------------------------------------------------------------------ ambient particles (decorative only)
 (function () {
