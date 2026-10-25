@@ -51,6 +51,23 @@ function renderHealth(h, extra) {
 }
 
 // ------------------------------------------------------------------ scanner
+async function loadQuickModes() {
+  const data = await api('/api/strategy-modes');
+  const label = String(data.activeConfig?.label || '');
+  const activeMode = (label.match(/strategy mode:\s*(SCALPING|HOLDING|SWING)/i) || [])[1]?.toUpperCase() || null;
+  $('#quickModeStatus').textContent = activeMode ? activeMode + ' ACTIVE' : 'Choose a mode';
+  $('#quickModes').innerHTML = data.modes.map((m) => '<button class="btn mode-btn ' + (m.id === activeMode ? 'active' : '') + '" data-quick-mode="' + esc(m.id) + '">' + esc(m.label) + '</button>').join('') + '<span class="small dim mode-note">Paper profiles only · not yet proven profitable</span>';
+  $('[data-quick-mode]').forEach((b) => (b.onclick = async () => {
+    if (b.dataset.quickMode === activeMode) return;
+    if (!confirm('Switch the active paper scanner to ' + b.dataset.quickMode + '? This saves a new config version; it does not place real orders.')) return;
+    try {
+      const result = await post('/api/strategy-modes', { mode: b.dataset.quickMode });
+      toast('Strategy switched', result.mode + ' is active as config version #' + result.version);
+      await loadQuickModes();
+      await refresh(true);
+    } catch (e) { toast('Strategy not changed', e.message); }
+  }));
+}
 async function loadScanner() {
   const [s, m, st] = await Promise.all([api('/api/shortlist'), api('/api/market'), api('/api/status')]);
   renderHealth(s.health);
@@ -218,7 +235,7 @@ async function loadSettings() {
   <div class="panel"><div class="setrow"><span>AI wallet automation</span>${field('walletEnabled', cfg.walletEnabled)}</div>${groups.map((g) => `<h3>${g}</h3>` + Object.entries(cfg[g]).map(([k, v]) => `<div class="setrow"><span>${k}</span>${field(g + '.' + k, v)}</div>`).join('')).join('')}
   <div class="filters" style="margin-top:12px"><input id="cfgLabel" placeholder="Change note (optional)" style="width:260px"><button class="btn" id="cfgSave">Save as new version</button></div></div>
   <div class="panel"><h3>Config versions (active: #${c.active.version})</h3>${c.versions.map((v) => `<div class="setrow"><span>#${v.id} · ${esc(v.label)} <span class="dim small">${ts(v.created_at)}</span></span><span>${v.id === c.active.version ? '<span class="badge b-g">ACTIVE</span>' : `<button class="btn" data-revert="${v.id}">Activate</button>`}</span></div>`).join('')}</div>`;
-  $('[data-mode]').forEach((b) => (b.onclick = async () => {
+  $$('[data-mode]').forEach((b) => (b.onclick = async () => {
     if (!confirm(`Apply ${b.dataset.mode} preset? This changes the active scanner thresholds, component weights and paper-wallet risk settings, and saves a new config version.`)) return;
     try { const r = await post('/api/strategy-modes', { mode: b.dataset.mode }); toast('Mode applied', `${r.mode} is active as config version #${r.version}`); loadSettings(); loadStrategies(); }
     catch (er) { toast('Rejected', er.message); }
@@ -319,7 +336,7 @@ $('#installApp').onclick = async () => {
   if (!installPrompt) { toast('Install Vertex Hunter', 'Use your browser menu and choose “Add to Home Screen” or “Install app”.'); return; }
   installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; $('#installApp').hidden = true;
 };
-pollNotifs(true).catch(() => {}); refresh(true);
+pollNotifs(true).catch(() => {}); loadQuickModes().catch((e) => toast('Strategy profiles unavailable', e.message)); refresh(true);
 
 // ------------------------------------------------------------------ ambient particles (decorative only)
 (function () {

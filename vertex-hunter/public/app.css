@@ -128,3 +128,6 @@ ul.reasons{margin:6px 0;padding-left:18px}ul.reasons li{margin:3px 0}
   .scan-head h2{font-size:15px}
   #chart{height:220px}
 }
+
+.mode-switcher{margin:12px 0}.mode-switcher .scan-head{margin-bottom:10px}.mode-buttons{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.mode-btn{min-width:120px}.mode-btn.active{border-color:var(--cyan,#27e6ff);color:var(--cyan,#27e6ff);box-shadow:0 0 0 1px rgba(39,230,255,.2) inset}.mode-note{margin-left:4px}
+@media(max-width:600px){.mode-btn{flex:1;min-width:90px}.mode-note{width:100%;margin:4px 0 0}}
